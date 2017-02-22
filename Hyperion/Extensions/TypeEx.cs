@@ -220,7 +220,7 @@ namespace Hyperion.Extensions
 
         public static Type GetTypeFromShortName(string shortName)
         {
-            return Type.GetType(shortName, ShortNameAssemblyResolver, null, true);
+            return Type.GetType(shortName, throwOnError: true);
         }
 
         private static Assembly ShortNameAssemblyResolver(AssemblyName name)
