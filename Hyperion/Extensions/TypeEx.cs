@@ -16,6 +16,9 @@ using System.Reflection;
 #if SERIALIZATION
 using System.Runtime.Serialization;
 #endif
+#if CORECLR
+using Microsoft.Extensions.DependencyModel;
+#endif
 
 namespace Hyperion.Extensions
 {
@@ -161,7 +164,7 @@ namespace Hyperion.Extensions
 
         public static Type GetNullableElement(this Type type)
         {
-            return type.GetTypeInfo().GetGenericArguments()[0];
+            return type.GetGenericArguments()[0];
         }
 
         public static bool IsFixedSizeType(this Type type)
@@ -202,7 +205,7 @@ namespace Hyperion.Extensions
         {
             string fullName;
 
-            if (type.IsGenericType)
+            if (type.GetTypeInfo().IsGenericType)
             {
                 var args = type.GetGenericArguments().Select(t => "[" + GetShortAssemblyQualifiedName(t) + "]");
                 fullName = type.Namespace + "." + type.Name + "[" + String.Join(",", args) + "]";
@@ -212,7 +215,7 @@ namespace Hyperion.Extensions
                 fullName = type.FullName;
             }
 
-            return fullName + ", " + type.Assembly.GetName().Name;
+            return fullName + ", " + type.GetTypeInfo().Assembly.GetName().Name;
         }
 
         public static Type GetTypeFromShortName(string shortName)
@@ -222,8 +225,33 @@ namespace Hyperion.Extensions
 
         private static Assembly ShortNameAssemblyResolver(AssemblyName name)
         {
-            var assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => String.Equals(a.GetName().Name, name.Name, StringComparison.OrdinalIgnoreCase));
+#if CORECLR
+            var assembly = GetAssemblies().FirstOrDefault(a => String.Equals(a.GetName().Name, name.Name, StringComparison.OrdinalIgnoreCase));
+#else
+            var assembly = System.AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => String.Equals(a.GetName().Name, name.Name, StringComparison.OrdinalIgnoreCase));
+#endif
             return assembly ?? Assembly.Load(name);
         }
+
+#if CORECLR
+        private static IEnumerable<Assembly> GetAssemblies()
+        {
+            var assemblies = new List<Assembly>();
+            var dependencies = DependencyContext.Default.RuntimeLibraries;
+            foreach (var library in dependencies)
+            {
+                try
+                {
+                    var assembly = Assembly.Load(new AssemblyName(library.Name));
+                    assemblies.Add(assembly);
+                }
+                catch (Exception e)
+                {
+                    //do nothing cant't if can't load assembly
+                }
+            }
+            return assemblies.ToArray();
+        }
+#endif
     }
 }
